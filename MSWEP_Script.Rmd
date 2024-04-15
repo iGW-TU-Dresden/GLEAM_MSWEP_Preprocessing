@@ -1,0 +1,404 @@
+# MSWEP Model: Download and Data Preprocessing
+
+The **Multi-Source Weighted-Ensemble Precipitation (MSWEP)** is a sub-daily precipitation dataset with full global coverage at 0.1° resolution, spanning the period 1979 to present. The product merges gauge, satellite, and reanalysis data.
+
+More information: <https://www.gloh2o.org/mswep/>
+
+Try executing the chunks by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*.
+
+### Install or activate the required libraries
+
+```{r}
+#install.packages(c("googledrive", "ncdf4", "ncdf4.helpers", "raster", "reshape2", "terra", "sf"))
+
+library(dplyr)
+library(googledrive)
+library(gtools)
+library(lubridate)
+library(ncdf4)
+library(ncdf4.helpers)
+library(raster)
+library(reshape2)
+library(sf)
+```
+
+## 1. Set paths and directory
+
+In the next step, you can choose the folder where the results will be stored, and either select a shapefile representing the region (polygon) of interest or choose a CSV file containing the coordinates of interest.
+
+```{r}
+# Destination folder for downloaded files and data storage
+user_wd <- readline(prompt = "Please enter your directory path: ")
+user_wd <- gsub('"', '', user_wd); user_wd <- gsub('\\\\','/',user_wd)
+
+while (!dir.exists(user_wd)) {
+  print("Invalid directory. Please enter a valid one.")
+  user_wd <- readline(prompt = "Please enter your directory path: ")
+  user_wd <- gsub('"', '', user_wd); user_wd <- gsub('\\\\','/',user_wd)
+}
+print(paste("You entered a valid directory: <",user_wd,">. A temporary folder for data storage will be created."))
+
+# Create the destination folder if it doesn't exist
+temp_folder <- "temp_MSWEP"
+user_wd <- file.path(user_wd, temp_folder)
+user_wd <- gsub("//", "/", user_wd)
+
+if (!dir.exists(user_wd)) {
+  dir.create(user_wd)
+}
+
+# Set the path to the MSWEP_daily_df.rds file
+daily_df_path <- readline(prompt = "Please enter the location of the RDS file called MSWEP_daily_df : ")
+daily_df_path <- gsub('"', '', daily_df_path); daily_df_path <- gsub('\\\\','/',daily_df_path)
+
+while (!file.exists(daily_df_path)) {
+  print("Invalid file path. Please enter a valid one.")
+  daily_df_path <- readline(prompt = "Please enter the path to the RDS file. Example: path/to/your/folder/MSWEP_daily_df.rds :")
+  daily_df_path <- gsub('"', '', daily_df_path); daily_df_path <- gsub('\\\\','/',daily_df_path)
+}
+print(paste("You entered a valid path.", daily_df_path))
+
+daily_df <-  readRDS(file = daily_df_path) # Read RDS file
+
+# Set the path to a. shapefile or b. CSV file with coordinates 
+user_choice <- readline(prompt = "Please enter 'a' to input the location of your shapefile or 'b' to for CSV with coordinates: ")
+
+if (tolower(user_choice) == "a") {
+  # Read shapefile
+  shp_path <- readline(prompt = "Please enter the path to your shapefile. Example: path/to/your/folder/polygon.shp :")
+  shp_path <- gsub('"', '', shp_path); shp_path <- gsub('\\\\','/',shp_path)
+
+  while (!file.exists(shp_path)) {
+    print("Invalid file path. Please enter a valid one.")
+    shp_path <- readline(prompt = "Please enter the path to your shapefile. Example: path/to/your/folder/polygon.shp :")
+    shp_path <- gsub('"', '', shp_path); shp_path <- gsub('\\\\','/',shp_path)
+  }
+
+  shp <- st_read(shp_path)
+  print(paste("You entered a valid path for the shapefile:", shp_path))
+
+} else if (tolower(user_choice) == "b") {
+  # Read CSV
+  coord_path <- readline(prompt = "Please enter the path to your CSV with coordinates. Format: two columns latitude longitude. Example: path/to/your/folder/coordinates.csv :")
+  coord_path <- gsub('"', '', coord_path); coord_path <- gsub('\\\\','/',coord_path)
+
+  while (!file.exists(coord_path)) {
+    print("Invalid file path. Please enter a valid one.")
+    coord_path <- readline(prompt = "Please enter the path to your CSV with coordinates. Format: two columns latitude longitude. Example: path/to/your/folder/coordinates.csv :")
+    coord_path <- gsub('"', '', coord_path); coord_path <- gsub('\\\\','/',coord_path)
+  }
+
+  coord_df <- read.csv(coord_path)
+  print(paste("You entered a valid path for the CSV file:", coord_path))
+
+} else {
+  cat("Invalid choice. Please enter 'a' or 'b'.\n")
+}
+```
+
+## 2. Enter the time window of your interest
+
+```{r}
+current_year <- as.numeric(format(Sys.Date(), "%Y"))
+
+#Enter the start and end year you are interested in
+start_year <- NA
+end_year <- NA
+
+while (is.na(start_year) || is.na(end_year)) {
+
+  start_year <- as.numeric(readline(prompt = "Enter the start year you are interested in: "))
+  
+    if (is.na(start_year) || start_year < 1980) {
+    print("Error: Invalid input. Please enter a valid numeric value starting from 1980.")
+    next  # Restart from the beginning
+  }
+  
+  end_year <- as.numeric(readline(prompt = "Enter the end year you are interested in: "))
+  
+  if (end_year < start_year || end_year > current_year) {
+    print("Error: End year cannot be smaller than the start year or larger than the current year. Please enter valid years.")
+    end_year <- as.numeric(readline(prompt = "Enter the end year you are interested in: "))
+  }
+}
+
+print(paste0("Input is valid. Your request will be processed from ", start_year, " to ", end_year, ". :)"))
+```
+
+## 3. Download the dataset of interest
+
+**Connect to the SFTP Server where the MSWEP dataset is located**
+
+The dataset will be downloaded for the assigned variable and years and stored in the pre-determined directory on your local computer.
+
+```{r}
+# Create folder to store the NetCDF files
+nc_files <- dir.create(file.path(user_wd, "nc_files"))
+
+# Authenticate with Google Drive
+drive_auth()
+
+# List to store downloaded file names
+downloaded_files <- c()
+
+# Dataset download
+for (year in start_year:end_year) {
+  # Filter the data frame for the current year
+  files_for_year <- daily_df$id[daily_df$year == year]
+  
+  # Loop through the file IDs for the current year
+  for (file_id in files_for_year) {
+    # Extract date for the current file
+    date <- daily_df$date[daily_df$id == file_id]
+    
+    # Construct the destination path for each file
+    name <- paste0("MSWEP_daily_", date, ".nc")
+    name <- gsub("-", "_", name)
+    
+    user_path <- file.path(user_wd, "nc_files", name)
+    
+    # Check if the file has already been downloaded (in case of restarting the process)
+    if (name %in% downloaded_files) {
+      cat("Skipping already downloaded file:", name, "\n")
+      next  # Skip to the next iteration
+    }
+    
+    # Attempt to download the file with error handling
+    tryCatch(
+      {
+        cat("Downloading:", name, "\n")
+        drive_download(as_id(file_id), path = user_path, overwrite = TRUE)
+        cat("Downloaded:", name, "\n")
+        
+        # Add the file name to the list of downloaded files
+        downloaded_files <- c(downloaded_files, name)
+      },
+      error = function(e) {
+        cat("Error downloading:", name, "\n")
+        print(e)
+      }
+    )
+    
+    Sys.sleep(2)  # Add a delay of 2 seconds between downloads to avoid rate limiting
+  }
+}
+drive_deauth()
+```
+
+## 4. Preprocessing of MSWEP NetCDF dataset
+
+If you are interested in preprocessing the data for a shapefile, please run the chunks i and ii from section 4.1. If you are interested in a CSV file, please run section 4.2.
+
+After running the following chunks, the results will be stored in a folder called 'results' within your specified working directory.
+
+### 4.1. Shapefile (polygon)
+
+#### i. Average daily values for the region (polygon) of interest
+
+```{r}
+# Create folder and empty data frame to store output data
+results_shp <- dir.create(file.path(user_wd, "results_shp")) # Results folder
+output_daily <- data.frame() # Empty data frame
+
+# List all NetCDF files in the directory
+nc_files <- list.files(path = file.path(user_wd, "nc_files"), pattern = "\\.nc$", full.names = TRUE)
+variable <- "precipitation"
+
+# Extract the minimum and maximum coordinates of your shapefile
+bbox <- st_bbox(shp)
+lat_min <- min(bbox[2])
+lat_max <- max(bbox[4])
+lon_min <- min(bbox[1])
+lon_max <- max(bbox[3])
+
+# Set your region of interest's latitude and longitude range
+lat_range <- c(lat_min, lat_max)
+lon_range <- c(lon_min, lon_max)
+
+# Iterate through each NetCDF file
+for (i in 1:length(nc_files)) {
+  
+  nc <- nc_open(nc_files[i])
+
+  lat <- ncvar_get(nc, "lat")
+  lon <- ncvar_get(nc, "lon")
+  units <- nc[["var"]][[variable]][["units"]]
+
+  # Find the indices of latitudes and longitudes within your region of interest
+  lat_indices <- which(lat >= lat_range[1] & lat <= lat_range[2])
+  lon_indices <- which(lon >= lon_range[1] & lon <= lon_range[2])
+
+  # Data extraction from NetCDF for the region of interest
+  data_var <- ncvar_get(nc, variable, start = c(lon_indices[1], lat_indices[1], 1), 
+                        count = c(length(lon_indices), length(lat_indices), -1))
+  
+  #Extract the respective date
+  date <- sub(".*MSWEP_daily_", "", nc$filename)
+  date <- sub(".nc", "", date)
+  date <- as.Date(date, format = "%Y_%m_%d")
+  
+  # Compute the daily average over the region of interest 
+  p_mean <- mean(as.matrix(data_var), na.rm = TRUE)  
+  
+  # Join both date and mean into a same data frame
+  df_var <- data.frame(day=date, p=p_mean)
+  output_daily <- rbind(output_daily, df_var) # Join current year with previous result
+  
+  nc_close(nc)
+}
+
+# Rename the columns and days based on the start and end dates
+colnames(output_daily) <- c("Date", paste0("Precipitation", " [",units,"]"))
+
+output_daily$Date <- as.character(seq.Date(as.Date(paste(start_year, "-01-01", sep = "")), 
+                                              by = "days", length.out = nrow(output_daily)))
+
+# Export the results as a CSV file
+write.csv(output_daily, file.path(user_wd, "results_shp", "shp_output_daily.csv"), row.names = FALSE)
+
+if (exists("output_daily")) {
+  print("Data extraction from NetCDF files completed.")
+}
+```
+
+#### ii. Average monthly values for the region (polygon) of interest
+
+```{r}
+month_values <- output_daily
+colnames(month_values) <- c("day", "var")
+
+month_values$day <- as.Date(month_values$day, format = "%Y-%m-%d")
+month_values$month <- format(month_values$day, "%m") # Create column with correspondent month
+
+# Monthly average precipitation rates [mm/day]
+monthly_rate <- month_values %>%
+  group_by(year = format(day, "%Y"), month) %>%
+  summarise(var = mean(var, na.rm = TRUE))
+
+# Accumulated monthly precipitation [mm/month]
+monthly_acc <- month_values %>%
+  group_by(year = format(day, "%Y"), month) %>%
+  summarise(var = sum(var, na.rm = TRUE))
+
+# Long-term monthly average
+long_term_av <- monthly_acc %>%
+  group_by(month) %>%
+  summarise(var = mean(var, na.rm = TRUE))
+
+colnames(monthly_rate) <- c("Year", "Month", paste0("Monthly Av Precipitation Rate [mm/day]"))
+colnames(monthly_acc) <- c("Year", "Month", paste0("Accumulated Monthly Precipitation [mm/month]"))
+colnames(long_term_av) <- c("Month", paste0("Long-term Monthly Av Precipitation [mm/month]"))
+
+# Export the results as a CSV files
+write.csv(monthly_rate, file.path(user_wd, "results_shp", "shp__monthly_rate.csv"), row.names = FALSE)
+write.csv(monthly_acc, file.path(user_wd, "results_shp", "shp__monthly_acc.csv"), row.names = FALSE)
+write.csv(long_term_av, file.path(user_wd, "results_shp", "shp_long_term_monthly_av.csv"), row.names = FALSE)
+```
+
+### 4.2. CSV with coordinates
+
+#### i. Average daily values for the list of coordinates of interest
+
+```{r}
+# Create folder to store output data
+results_csv <- dir.create(file.path(user_wd, "results_csv"))
+
+# Save csv file with id for each location
+colnames(coord_df) <- c("lat", "long")
+coord_df$id <- seq_len(nrow(coord_df))
+write.csv(coord_df, file.path(user_wd,  "results_csv", paste0("location_id.csv")), row.names = FALSE)
+
+# List all NetCDF files in the directory
+nc_files <- list.files(path = file.path(user_wd, "nc_files"), pattern = "\\.nc$", full.names = TRUE)
+variable <- "precipitation"
+
+# Iterate through each NetCDF file and each row of the coordinates data frame
+for (i in 1:nrow(coord_df)) {
+  # Create an empty data frame to store data for each coordinate set
+  location_output_daily <- data.frame()
+  
+  for (j in 1:length(nc_files)) {
+    
+    nc <- nc_open(nc_files[j])
+    lat_nc <- ncvar_get(nc, "lat")
+    long_nc <- ncvar_get(nc, "lon")
+    
+    target_lat <- coord_df$lat[i]
+    target_long <- coord_df$long[i]
+    units <- nc[["var"]][[variable]][["units"]]
+    
+    # Find the nearest latitude and longitude indices to the target point
+    nearest_lat_index <- which.min(abs(lat_nc - target_lat))
+    nearest_long_index <- which.min(abs(long_nc - target_long))
+    
+    point_data <- ncvar_get(nc, variable, start = c(nearest_long_index, nearest_lat_index, 1),
+                            count = c(1, 1, -1))
+    point_data <- as.vector(point_data)
+    
+    # Extract the respective date
+    date <- sub(".*MSWEP_daily_", "", nc$filename)
+    date <- sub(".nc", "", date)
+    date <- as.Date(date, format = "%Y_%m_%d")
+    
+    # Join results into the same data frame
+    point_df <- data.frame(id = coord_df$id[i], lat = target_lat, long = target_long, date = date, variable = point_data)
+    colnames(point_df) <- c("Id", "Lat", "Long", "Date", paste0("Precipitation", " [",units,"]"))
+    
+    location_output_daily <- rbind(location_output_daily, point_df) # Join current year with previous result
+    
+    nc_close(nc)
+  }
+  
+  # Save the data for the current location to a CSV file
+  location_filename <- paste0("location_", i, "_output_daily.csv")
+  write.csv(location_output_daily, file.path(user_wd, "results_csv", location_filename), row.names = FALSE)
+  
+  print(paste0("Results for location ", i, " have been saved. :)"))
+}
+```
+
+#### ii. Average monthly values for the list of coordinates of interest
+
+```{r}
+output_daily <- list.files(file.path(user_wd, "results_csv"), pattern = "location_.*_output_daily.csv", full.names = TRUE)
+output_daily <- mixedsort(output_daily)  # Sort the files
+
+for (i in 1:length(output_daily)) {
+  location_data <- read.csv(output_daily[i])
+  colnames(location_data) <- c("id", "lat", "long", "day", "var")
+  
+  location_data$day <- as.Date(location_data$day, format = "%Y-%m-%d")
+  location_data$month <- format(location_data$day, "%m")
+  
+  # Monthly average precipitation rates [mm/day]
+  monthly_rate <- location_data %>%
+    group_by(id, lat, long, year = format(day, "%Y"), month) %>%
+    summarise(var = mean(var, na.rm = TRUE))
+  
+  # Accumulated monthly precipitation [mm/month]
+  monthly_acc <- location_data %>%
+    group_by(id, lat, long, year = format(day, "%Y"), month) %>%
+    summarise(var = sum(var, na.rm = TRUE))
+  
+  # Long-term monthly average precipitation [mm/month]
+  long_term_av <- monthly_acc %>%
+    group_by(id, lat, long, month) %>%
+    summarise(var = mean(var, na.rm = TRUE))
+  
+  # Export results as CSV files
+  common_cols <- c("Id", "Lat", "Lon")
+  colnames(monthly_rate) <- c(common_cols, "Year", "Month", "Monthly Av Precipitation Rate [mm/day]")
+  colnames(monthly_acc) <- c(common_cols, "Year", "Month", "Accumulated Monthly Precipitation [mm/month]")
+  colnames(long_term_av) <- c(common_cols, "Month", "Long-term Monthly Av Precipitation [mm/month]")
+  
+  monthly_rate_filename <- paste0("location_", i, "_monthly_rate.csv")
+  monthly_acc_filename <- paste0("location_", i, "_monthly_accumulated.csv")
+  long_term_filename <- paste0("location_", i, "_long_term_monthly_av.csv")
+  
+  write.csv(monthly_rate, file.path(user_wd, "results_csv", monthly_rate_filename), row.names = FALSE)
+  write.csv(monthly_acc, file.path(user_wd, "results_csv", monthly_acc_filename), row.names = FALSE)
+  write.csv(long_term_av, file.path(user_wd, "results_csv", long_term_filename), row.names = FALSE)
+  
+  print(paste0("Results for location ", i, " have been saved. :)"))
+}
+```
