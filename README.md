@@ -5,7 +5,7 @@ The GLEAM and MSWEP scripts are R Markdown documents that guide users in downloa
 
 The **Multi-Source Weighted-Ensemble Precipitation (MSWEP)** is a sub-daily precipitation dataset with global coverage at 0.1° resolution, spanning the period from 1979 to the present. More information can be found at: *https://www.gloh2o.org/mswep/*
 
-The **Global Land Evaporation Amsterdam Model (GLEAM)** estimates the different components of land evaporation. The datasets are provided at 0.25° resolution and are available with daily temporal resolution from 1980 to 2022. Available variables from the GLEAM model include: Actual Evaporation (E), Soil Evaporation (Eb), Interception Loss (Ei), Potential Evaporation (Ep), Snow Sublimation (Es), Transpiration (Et), Open-Water Evaporation (Ew), Evaporative Stress (S), Root-Zone Soil Moisture (SMroot), and Surface Soil Moisture (SMsurf). More information can be found at: *https://www.gleam.eu/*
+The **Global Land Evaporation Amsterdam Model (GLEAM)** estimates the different components of land evaporation. The datasets are provided at 0.25° resolution and are available with daily temporal resolution from 1980 to 2023. Available variables from the GLEAM model include: Actual Evaporation (E), Soil Evaporation (Eb), Interception Loss (Ei), Potential Evaporation (Ep), Snow Sublimation (Es), Transpiration (Et), Open-Water Evaporation (Ew), Evaporative Stress (S), Root-Zone Soil Moisture (SMroot), and Surface Soil Moisture (SMsurf). More information can be found at: *https://www.gleam.eu/*
 
 ## About the scripts
 
