@@ -1,6 +1,6 @@
 # GLEAM Model: Download and Data Preprocessing
 
-The **Global Land Evaporation Amsterdam Model (GLEAM)** estimates the different components of land evaporation. The following script guides you in downloading and processing the **GLEAM v3.8a** global dataset available from 1980 (January 1st) to 2022 (December 31st).
+The **Global Land Evaporation Amsterdam Model (GLEAM)** estimates the different components of land evaporation. The following script guides you in downloading and processing the **GLEAM v3.8a** global dataset available from 1980 (January 1st) to 2023 (December 31st).
 
 More information: <https://www.gleam.eu/>
 
@@ -131,8 +131,8 @@ while (is.na(start_year) || is.na(end_year)) {
   
   end_year <- as.numeric(readline(prompt = "Enter the end year you are interested in: "))
   
-  if (end_year <= start_year || end_year > 2022) {
-    print("Error: End year cannot be earlier than the start year or later than the year 2022. Please enter valid years.")
+  if (end_year <= start_year || end_year > 2023) {
+    print("Error: End year cannot be earlier than the start year or later than the year 2023. Please enter valid years.")
     end_year <- as.numeric(readline(prompt = "Enter the end year you are interested in: "))
   }
 }
@@ -156,14 +156,14 @@ sftp_con <- sftp_connect(
   server = "hydras.ugent.be", 
   folder = NULL,
   username = "gleamuser",
-  password = "v37_GLEAM2023#aw",
+  password = "GLEAM4#h-cel#83",
   protocol = "sftp://",
   port = 2225,
   timeout = 30
 )
 
 # Change the directory to the Gleam daily dataset directory on the SFTP Server
-sftp_changedir(tofolder = sprintf("data/v3.8a/daily/%s", start_year),
+sftp_changedir(tofolder = sprintf("data/v4.1a/daily/%s", start_year),
                current_connection_name = "sftp_con",
                verbose = TRUE)
 
@@ -176,7 +176,7 @@ for (year in start_year:end_year) {
                  current_connection_name = "sftp_con",
                  verbose = TRUE)
 
-  sftp_download(file = sprintf("%s_%s_GLEAM_v3.8a.nc", variable, year), tofolder = nc_files)
+  sftp_download(file = sprintf("%s_%s_GLEAM_v4.1a.nc", variable, year), tofolder = nc_files)
 }
 ```
 
