@@ -163,12 +163,14 @@ for (year in start_year:end_year) {
       next  # Skip to the next iteration
     }
     
+    # Construct the web content link for direct download
+    web_content_link <- paste0("https://drive.google.com/uc?id=", file_id, "&export=download")
+    
     # Attempt to download the file with error handling
     tryCatch(
       {
         cat("Downloading:", name, "\n")
-        drive_download(as_id(file_id), path = user_path, overwrite = TRUE)
-        cat("Downloaded:", name, "\n")
+        download.file(web_content_link, destfile = user_path, mode = "wb")        cat("Downloaded:", name, "\n")
         
         # Add the file name to the list of downloaded files
         downloaded_files <- c(downloaded_files, name)
