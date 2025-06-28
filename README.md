@@ -37,10 +37,12 @@ Once you have both R and RStudio installed on your computer, you can begin using
 
 ### Other contributors
 
+M.Sc. Maria Alejandra Vela Castillo (TU Dresden)
+
 M.Sc. Olawale Joshua Abidakun (TU Dresden)
 
 M.Sc. Joy Liu (TU Dresden)
 
-### Questions or suggestions
+### Questions
 
-Please contact: Maria Alejandra Vela | maria_alejandra.vela_castillo1@mailbox.tu-dresden.de
+Please contact: Prof. Dr. rer. nat. Andreas Hartmann | andreas.hartmann@tu-dresden.de
