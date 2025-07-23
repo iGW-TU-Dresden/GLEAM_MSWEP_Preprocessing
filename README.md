@@ -47,4 +47,5 @@ B.Sc. Xinyu Zhang (TU Dresden)
 
 ### Questions
 
-Please contact: Prof. Dr. rer. nat. Andreas Hartmann | andreas.hartmann@tu-dresden.de, B.Sc. Xinyu Zhang (TU Dresden) | xinyu.zhang3@mailbox.tu-dresden.de
+Please contact: Prof. Dr. rer. nat. Andreas Hartmann | andreas.hartmann@tu-dresden.de
+                B.Sc. Xinyu Zhang (TU Dresden) | xinyu.zhang3@mailbox.tu-dresden.de
