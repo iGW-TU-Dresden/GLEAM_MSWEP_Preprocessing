@@ -9,7 +9,7 @@ Try executing the chunks by clicking the *Run* button within the chunk or by pla
 ### Install or activate the required libraries
 
 ```{r}
-#install.packages(c("devtools", "ncdf4", "ncdf4.helpers", "raster", "reshape2", "terra", "sf"))
+#install.packages(c("devtools", "ncdf4", "ncdf4.helpers", "raster", "reshape2", "terra", "sf", "curl"))
 #devtools::install_github("stenevang/sftp")
 
 library(dplyr)
@@ -20,7 +20,8 @@ library(ncdf4.helpers)
 library(raster)
 library(reshape2)
 library(sf)
-library(sftp)
+library(curl)
+#library(sftp)
 ```
 
 ## 1. Set paths and directory
@@ -151,33 +152,31 @@ The dataset will be downloaded for the assigned variable and years and stored in
 nc_files <- dir.create(file.path(user_wd, "nc_files"))
 nc_files <- file.path(user_wd, "nc_files")
 
-# Connect to SFTP Server
-sftp_con <- sftp_connect(
-  server = "hydras.ugent.be", 
-  folder = NULL,
-  username = "gleamuser",
-  password = "GLEAM4#h-cel#83",
-  protocol = "sftp://",
-  port = 2225,
-  timeout = 30
-)
-
-# Change the directory to the Gleam daily dataset directory on the SFTP Server
-sftp_changedir(tofolder = sprintf("data/v4.1a/daily/%s", start_year),
-               current_connection_name = "sftp_con",
-               verbose = TRUE)
+username <- URLencode("gleamuser")
+password <- URLencode("GLEAM4#h-cel_924", reserved = TRUE)
 
 for (year in start_year:end_year) {
+  remote_path <- sprintf(
+    "sftp://%s:%s@hydras.ugent.be:2225/data/v4.2a/daily/%d/%s_%d_GLEAM_v4.2a.nc",
+    username, password, year, variable, year
+  )
 
-  sftp_changedir("..") # Return to the root directory after the first iteration
+  local_path <- file.path(nc_files, sprintf("%s_%d_GLEAM_v4.2a.nc", variable, year))
 
-  # Change from the root directory to the assigned year folder on SFTP Server
-  sftp_changedir(tofolder = sprintf("/%s", year),
-                 current_connection_name = "sftp_con",
-                 verbose = TRUE)
+  message(sprintf("Downloading %s ...", remote_path))
 
-  sftp_download(file = sprintf("%s_%s_GLEAM_v4.1a.nc", variable, year), tofolder = nc_files)
+  tryCatch({
+    curl_download(
+      url = remote_path,
+      destfile = local_path,
+      handle = new_handle()
+    )
+    message(sprintf("Download complete: %s", local_path))
+  }, error = function(e) {
+    message(sprintf("Failed to download %s: %s", year, e$message))
+  })
 }
+
 ```
 
 ## 4. Preprocessing of GLEAM NetCDF dataset
