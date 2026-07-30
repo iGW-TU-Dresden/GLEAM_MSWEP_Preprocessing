@@ -132,8 +132,8 @@ while (is.na(start_year) || is.na(end_year)) {
   
   end_year <- as.numeric(readline(prompt = "Enter the end year you are interested in: "))
   
-  if (end_year <= start_year || end_year > 2023) {
-    print("Error: End year cannot be earlier than the start year or later than the year 2023. Please enter valid years.")
+  if (end_year <= start_year || end_year > 2025) {
+    print("Error: End year cannot be earlier than the start year or later than the year 2025. Please enter valid years.")
     end_year <- as.numeric(readline(prompt = "Enter the end year you are interested in: "))
   }
 }
