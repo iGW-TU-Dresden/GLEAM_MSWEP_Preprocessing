@@ -16,7 +16,9 @@ The Rmd scripts are dynamic documents that combine narrative text with code chun
 3. Downloading the datasets of interest.
 4. Preprocessing the NetCDF files for either a shapefile or a list of coordinates.
 
-**Note:** To run the MSWEP script, please download the attached file 'MSWEP_daily_df.rds' and save it to your local folder. This file contains direct links to download the daily NetCDF files from the shared MSWEP Google Drive folders.
+**Note:** 
+- To run the MSWEP script, please download the attached file 'MSWEP_daily_df.rds' and save it to your local folder. This file contains direct links to download the daily NetCDF files from the shared MSWEP Google Drive folders.
+- To run the GLEAM script, please register on the GLEAM website using your email address. After registration, you will receive the required Host, Port, Username, and Password for SFTP access. Enter these credentials when prompted by the script to download the GLEAM data.
 
 ## About R and RStudio
 
