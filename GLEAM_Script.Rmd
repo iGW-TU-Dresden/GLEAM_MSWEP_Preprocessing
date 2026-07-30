@@ -152,16 +152,47 @@ The dataset will be downloaded for the assigned variable and years and stored in
 nc_files <- dir.create(file.path(user_wd, "nc_files"))
 nc_files <- file.path(user_wd, "nc_files")
 
-username <- URLencode("gleamuser")
-password <- URLencode("GLEAM4#h-cel_924", reserved = TRUE)
+cat("\nPlease enter your GLEAM SFTP login information.\n")
+cat("You can obtain it from https://www.gleam.eu/\n\n")
+
+host <- readline(
+  prompt = "SFTP Host (e.g. aether.ugent.be): "
+)
+
+host <- gsub("^sftp://", "", trimws(host))
+
+port <- readline(
+  prompt = "SFTP Port (e.g. 2225): "
+)
+
+username <- readline(
+  prompt = "Username: "
+)
+
+password <- readline(
+  prompt = "Password: "
+)
+
+username <- URLencode(username)
+password <- URLencode(password, reserved = TRUE)
 
 for (year in start_year:end_year) {
+
   remote_path <- sprintf(
-    "sftp://%s:%s@hydras.ugent.be:2225/data/v4.2a/daily/%d/%s_%d_GLEAM_v4.2a.nc",
-    username, password, year, variable, year
+    "sftp://%s:%s@%s:%s/data/v4.3a/daily/%d/%s_%d_GLEAM_v4.3a.nc",
+    username,
+    password,
+    host,
+    port,
+    year,
+    variable,
+    year
   )
 
-  local_path <- file.path(nc_files, sprintf("%s_%d_GLEAM_v4.2a.nc", variable, year))
+  local_path <- file.path(
+    nc_files,
+    sprintf("%s_%d_GLEAM_v4.3a.nc", variable, year)
+  )
 
   message(sprintf("Downloading %s ...", remote_path))
 
